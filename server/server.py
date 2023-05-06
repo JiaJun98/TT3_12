@@ -9,6 +9,7 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import get_jwt
 from flask_cors import CORS
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -24,6 +25,7 @@ jwt = JWTManager(app)
 connection = 'mongodb://rwuser:Singapore123!@190.92.206.138:27017,159.138.120.227:27017/test?authSource=admin'
 client = MongoClient(connection)
 mydb = client.mydb
+
 
 #### Retrieve Project ID
 @app.route("/info", methods=['GET'])
@@ -46,10 +48,45 @@ def get_info():
 
 
 #### Create Claim ####
-@app.route("/create", methods=['GET'])
-@jwt_required
+@app.route("/create", methods=['POST'])
+@jwt_required()
 def create_claim():
     payload = get_jwt()
+    content = request.json
+    employee_id = payload["EmployeeID"]
+    # firstname = content["FirstName"]
+    # lastname = content["LastName"]
+    project_id = content["ProjectID"]
+    currency_id = content["CurrencyID"]
+    expense_date = content["ExpenseDate"]
+    amount = content["Amount"]
+    purpose = content["Purpose"]
+    chargeToDefault = content["ChargeToDefaultDept"]
+    alternativeDeptCode = content["AlternativeDeptCode"]
+    currency = mydb.Currency.find_one({"CurrencyID":currency_id})
+    latest_claim = mydb.ProjectExpenseClaims.find().sort("ClaimID",-1).limit(1).next()
+    print(latest_claim)
+    latest_claim_id = str(int(latest_claim["ClaimID"]) + 1)
+    print(latest_claim_id)
+    timenow = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    new_doc = {
+          "ClaimID": latest_claim_id,
+          "ProjectID": project_id,
+          "CurrencyID": currency_id,
+          "EmployeeID": employee_id,
+          "ExpenseDate": expense_date,
+          "Amount": amount,
+          "Purpose": purpose,
+          "ChargeToDefaultDept": chargeToDefault,
+          "AlternativeDeptCode": alternativeDeptCode,
+          "Status": "Pending",
+          "LastEditedClaimDate": timenow
+    }
+    
+    mydb.ProjectExpenseClaims.insert_one(new_doc)
+    return {"message":"Success"}, 200
+    
+    
 
 #User Log in 
 @app.route("/login", methods=["POST"])
